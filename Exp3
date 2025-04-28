@@ -1,0 +1,31 @@
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <BlynkSimpleEsp32.h>  // Use BlynkSimpleEsp8266.h if using ESP8266
+#include <DHT.h>
+
+#define DHTPIN 4
+#define DHTTYPE DHT11
+
+char auth[] = "Your_Blynk_Auth_Token";   
+char ssid[] = "";          
+char pass[] = "";     
+
+DHT dht(DHTPIN, DHTTYPE);
+
+void setup() {
+  Serial.begin(115200);
+  dht.begin();
+  Blynk.begin(auth, ssid, pass);
+}
+
+void loop() {
+  Blynk.run();
+  
+  float h = dht.readHumidity();
+  float t = dht.readTemperature();
+  
+  Blynk.virtualWrite(V0, t);  // Send temperature to Virtual Pin V0
+  Blynk.virtualWrite(V1, h);  // Send humidity to Virtual Pin V1
+
+  delay(2000);  // Wait 2 seconds before next reading
+}
