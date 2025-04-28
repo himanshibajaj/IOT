@@ -1,0 +1,46 @@
+# subscriber.py
+import paho.mqtt.client as mqtt
+
+# Callback when the client receives a CONNACK response from the server
+def on_connect(client, userdata, flags, rc):
+    print("Connected with result code " + str(rc))
+    # Subscribe to the topic after connection
+    client.subscribe("my/topic")
+
+# Callback when a PUBLISH message is received from the server
+def on_message(client, userdata, msg):
+    print(f"Received message: {msg.payload.decode()} on topic {msg.topic}")
+
+# Create an MQTT client instance
+client = mqtt.Client()
+
+# Assign the callback functions
+client.on_connect = on_connect
+client.on_message = on_message
+
+# Connect to the MQTT broker
+client.connect("mqtt.eclipseprojects.io", 1883, 60)
+
+# Keep the client running
+client.loop_forever()
+
+
+
+
+
+# publisher.py
+import paho.mqtt.client as mqtt
+
+# Create an MQTT client instance
+client = mqtt.Client()
+
+# Connect to the MQTT broker
+client.connect("mqtt.eclipseprojects.io", 1883, 60)
+
+# Publish a message to the same topic
+client.publish("my/topic", "Hello from Publisher!")
+
+print("Message Published!")
+
+# Disconnect from the broker
+client.disconnect()
