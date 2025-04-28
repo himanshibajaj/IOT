@@ -1,0 +1,49 @@
+#include <ESP8266WiFi.h>
+#include <DHT.h>
+#include <ESP8266HTTPClient.h>
+
+#define DHTPIN D4
+#define DHTTYPE DHT11
+
+const char* ssid = "Your_WiFi_Name";
+const char* password = "Your_WiFi_Password";
+String accessToken = "Your_Pushbullet_Access_Token";
+
+DHT dht(DHTPIN, DHTTYPE);
+WiFiClient client;
+
+void setup() {
+  Serial.begin(115200);
+  dht.begin();
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("WiFi connected");
+}
+
+void loop() {
+  float h = dht.readHumidity();
+  float t = dht.readTemperature();
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    
+    http.begin(client, "https://api.pushbullet.com/v2/pushes");
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("Access-Token", accessToken);
+    
+    String message = "{\"type\": \"note\", \"title\": \"Sensor Update\", \"body\": \"Temp: " + String(t) + "C, Humidity: " + String(h) + "%\"}";
+    
+    int httpResponseCode = http.POST(message);
+    
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+    
+    http.end();
+  }
+  
+  delay(10000);
+}
