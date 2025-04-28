@@ -1,0 +1,26 @@
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <BlynkSimpleEsp32.h>  // If using ESP32
+//#include <BlynkSimpleEsp8266.h>  // Uncomment if using ESP8266 (NodeMCU)
+
+char auth[] = "Your_Blynk_Auth_Token";
+char ssid[] = "Your_WiFi_Name";
+char pass[] = "Your_WiFi_Password";
+
+#define LED_PIN 2   // Built-in LED (GPIO2 for NodeMCU)
+
+void setup() {
+  Serial.begin(115200);
+  Blynk.begin(auth, ssid, pass);
+  pinMode(LED_PIN, OUTPUT);
+}
+
+void loop() {
+  Blynk.run();
+}
+
+// Button Widget linked to Virtual Pin V0 to control the LED
+BLYNK_WRITE(V0) {
+  int pinValue = param.asInt();  // Get the state of the button
+  digitalWrite(LED_PIN, pinValue);  // Turn LED on or off based on button state
+}
