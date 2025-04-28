@@ -1,0 +1,117 @@
+#include <ESP8266WiFi.h>
+#include <ESPAsyncWebServer.h>
+#include <ESPAsyncTCP.h>
+
+// Wi-Fi Credentials
+const char* ssid = "Your_SSID_Here";
+const char* password = "Your_PASSWORD_Here";
+
+// Relay Configuration
+#define RELAY_NO true  // Set true for Normally Open relays
+#define NUM_RELAYS 4
+
+int relayPins[NUM_RELAYS] = {5, 4, 14, 12}; // D1, D2, D5, D6
+
+// Server on port 80
+AsyncWebServer server(80);
+
+// HTML Webpage
+const char index_html[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    html { font-family: Arial; text-align: center; }
+    .switch { position: relative; display: inline-block; width: 120px; height: 68px; }
+    .switch input { display: none; }
+    .slider { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; border-radius: 34px; }
+    .slider:before { content: ""; position: absolute; height: 52px; width: 52px; left: 8px; bottom: 8px; background: white; transition: .4s; border-radius: 50%; }
+    input:checked + .slider { background-color: #2196F3; }
+    input:checked + .slider:before { transform: translateX(52px); }
+  </style>
+</head>
+<body>
+  <h2>ESP8266 Relay Control</h2>
+  %BUTTONS%
+<script>
+function toggleRelay(element) {
+  var xhr = new XMLHttpRequest();
+  var state = element.checked ? 1 : 0;
+  xhr.open("GET", `/update?relay=${element.id}&state=${state}`, true);
+  xhr.send();
+}
+</script>
+</body>
+</html>
+)rawliteral";
+
+// Functions
+String createButtons(const String& var) {
+  if (var == "BUTTONS") {
+    String buttons = "";
+    for (int i = 1; i <= NUM_RELAYS; i++) {
+      String state = getRelayState(i);
+      buttons += "<h4>Relay #" + String(i) + " (GPIO " + String(relayPins[i-1]) + ")</h4>";
+      buttons += "<label class=\"switch\">";
+      buttons += "<input type=\"checkbox\" id=\"" + String(i) + "\" onchange=\"toggleRelay(this)\" " + state + ">";
+      buttons += "<span class=\"slider\"></span></label><br><br>";
+    }
+    return buttons;
+  }
+  return String();
+}
+
+String getRelayState(int relay) {
+  bool pinState = digitalRead(relayPins[relay - 1]);
+  if (RELAY_NO) {
+    return pinState ? "" : "checked";
+  } else {
+    return pinState ? "checked" : "";
+  }
+}
+
+void setup() {
+  Serial.begin(9600);
+
+  // Setup Relay Pins
+  for (int i = 0; i < NUM_RELAYS; i++) {
+    pinMode(relayPins[i], OUTPUT);
+    digitalWrite(relayPins[i], RELAY_NO ? HIGH : LOW); // Default OFF
+  }
+
+  // Connect to WiFi
+  WiFi.begin(ssid, password);
+  Serial.println("Connecting...");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nConnected! IP: ");
+  Serial.println(WiFi.localIP());
+
+  // Web Routes
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    String html = index_html;
+    html.replace("%BUTTONS%", createButtons("BUTTONS"));
+    request->send(200, "text/html", html);
+  });
+
+  server.on("/update", HTTP_GET, [](AsyncWebServerRequest *request){
+    if (request->hasParam("relay") && request->hasParam("state")) {
+      int relay = request->getParam("relay")->value().toInt() - 1;
+      int state = request->getParam("state")->value().toInt();
+      if (relay >= 0 && relay < NUM_RELAYS) {
+        digitalWrite(relayPins[relay], RELAY_NO ? !state : state);
+        Serial.printf("Relay %d set to %d\n", relay + 1, state);
+      }
+    }
+    request->send(200, "text/plain", "OK");
+  });
+
+  server.begin();
+}
+
+void loop() {
+  // Nothing here
+}
