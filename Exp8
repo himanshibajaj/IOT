@@ -1,46 +1,96 @@
-# subscriber.py
+#arduino code
+#include <PubSubClient.h>
+#include <ESP8266WiFi.h>
+
+// WiFi Credentials
+const char* ssid = "iPhone";
+const char* password = "Ambernath";
+
+// MQTT Broker Details
+const char* mqtt_server = "mqtt.eclipseprojects.io";
+const int mqtt_port = 1883;
+const char* mqtt_topic_sub = "pi/data"; // Topic to Subscribe
+const char* mqtt_topic_pub = "pi/data"; // Topic to Publish
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+void setup_wifi() {
+  delay(10);
+  Serial.println("\nConnecting to WiFi...");
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi Connected!");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
+}
+
+void reconnect() {
+  while (!client.connected()) {
+    Serial.println("Attempting MQTT connection...");
+    if (client.connect("NodeMCUClient")) {
+      Serial.println("Connected to MQTT Broker!");
+      client.subscribe(mqtt_topic_sub);
+      client.publish(mqtt_topic_pub, "Himanshi_04");
+    }
+    else {
+      Serial.print("Failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" Retrying in 5 seconds...");
+      delay(5000);
+    }
+  }
+}
+
+void callback(char* topic, byte* payload, unsigned int length) {
+  Serial.print("Message received on topic: ");
+  Serial.println(topic);
+  Serial.print("Payload: ");
+  for (unsigned int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+  }
+  Serial.println();
+}
+
+void setup() {
+  Serial.begin(9600);
+  setup_wifi();
+  client.setServer(mqtt_server, mqtt_port);
+  client.setCallback(callback);
+}
+
+void loop() {
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();
+}
+
+
+#python code
 import paho.mqtt.client as mqtt
 
-# Callback when the client receives a CONNACK response from the server
-def on_connect(client, userdata, flags, rc):
-    print("Connected with result code " + str(rc))
-    # Subscribe to the topic after connection
-    client.subscribe("my/topic")
+# Create a client instance
+c = mqtt.Client()
 
-# Callback when a PUBLISH message is received from the server
-def on_message(client, userdata, msg):
-    print(f"Received message: {msg.payload.decode()} on topic {msg.topic}")
+# Define the on_connect callback
+def onc(c, userdata, flag, rc):
+    print("Connected with result code:", rc)
+    c.subscribe('pi/data')  # Subscribe to the same topic
 
-# Create an MQTT client instance
-client = mqtt.Client()
+# Define the on_message callback
+def onm(c, userdata, msg):
+    print("Received message:", msg.payload.decode())
 
-# Assign the callback functions
-client.on_connect = on_connect
-client.on_message = on_message
+# Assign callbacks
+c.on_connect = onc
+c.on_message = onm
 
-# Connect to the MQTT broker
-client.connect("mqtt.eclipseprojects.io", 1883, 60)
+# Connect to the public MQTT broker
+c.connect("mqtt.eclipseprojects.io", 1883)
 
-# Keep the client running
-client.loop_forever()
-
-
-
-
-
-# publisher.py
-import paho.mqtt.client as mqtt
-
-# Create an MQTT client instance
-client = mqtt.Client()
-
-# Connect to the MQTT broker
-client.connect("mqtt.eclipseprojects.io", 1883, 60)
-
-# Publish a message to the same topic
-client.publish("my/topic", "Hello from Publisher!")
-
-print("Message Published!")
-
-# Disconnect from the broker
-client.disconnect()
+# Start the loop
+c.loop_forever()
