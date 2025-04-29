@@ -1,49 +1,90 @@
 #include <ESP8266WiFi.h>
+#include <WiFiClientSecure.h>
 #include <DHT.h>
-#include <ESP8266HTTPClient.h>
 
-#define DHTPIN D4
+#define DHTPIN 4
 #define DHTTYPE DHT11
 
-const char* ssid = "Your_WiFi_Name";
-const char* password = "Your_WiFi_Password";
-String accessToken = "Your_Pushbullet_Access_Token";
-
 DHT dht(DHTPIN, DHTTYPE);
-WiFiClient client;
+
+const char* ssid = "";
+const char* password = "";
+String pushbulletAPIKey = "o.ta6TKZPdl0LvneGz7xyQSTAe3y7AgcuT";   /////
+String pushbulletURL = "https://api.pushbullet.com/v2/pushes";
+WiFiClientSecure client;
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
   dht.begin();
+  Serial.println("Connecting to Wi-Fi...");
   WiFi.begin(ssid, password);
-
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
+    delay(1000);
     Serial.print(".");
   }
-  Serial.println("WiFi connected");
+  Serial.println("Connected to Wi-Fi");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
+  client.setInsecure();
 }
 
 void loop() {
-  float h = dht.readHumidity();
-  float t = dht.readTemperature();
-  
-  if (WiFi.status() == WL_CONNECTED) {
-    HTTPClient http;
-    
-    http.begin(client, "https://api.pushbullet.com/v2/pushes");
-    http.addHeader("Content-Type", "application/json");
-    http.addHeader("Access-Token", accessToken);
-    
-    String message = "{\"type\": \"note\", \"title\": \"Sensor Update\", \"body\": \"Temp: " + String(t) + "C, Humidity: " + String(h) + "%\"}";
-    
-    int httpResponseCode = http.POST(message);
-    
-    Serial.print("HTTP Response code: ");
-    Serial.println(httpResponseCode);
-    
-    http.end();
+  float temperature = dht.readTemperature();
+  float humidity = dht.readHumidity();
+  if (isnan(temperature) || isnan(humidity)) {
+    Serial.println("Failed to read from DHT sensor! Retrying...");
+    delay(2000);
+    return;
   }
-  
+  String message = "{\"type\": \"note\", \"title\": \"NodeMCU DHT11 Notification\", ";
+  message += "\"body\": \"Roll no.4, Temperature: " + String(temperature) + "°C, Humidity: " + String(humidity) + "%\"}";
+  bool pushSent = sendPushbulletNotification(message);
+  Serial.print("Temperature: ");
+  Serial.print(temperature);
+  Serial.print("°C, Humidity: ");
+  Serial.print(humidity);
+  if (pushSent) {
+    Serial.println("% | Notification sent on Pushbullet");
+  } else {
+    Serial.println("% | Notification sending failed");
+  }
   delay(10000);
+}
+
+bool sendPushbulletNotification(String message) {
+  if (client.connect("api.pushbullet.com", 443)) {
+    client.println("POST /v2/pushes HTTP/1.1");
+    client.println("Host: api.pushbullet.com");
+    client.println("Authorization: Bearer " + pushbulletAPIKey);
+    client.println("Content-Type: application/json");
+    client.print("Content-Length: ");
+    client.println(message.length());
+    client.println();
+    client.println(message);
+    unsigned long timeout = millis();
+    while (client.available() == 0) {
+      if (millis() - timeout > 5000) {
+        Serial.println("Connection timed out");
+        client.stop();
+        return false;
+      }
+    }
+    String response = "";
+    while (client.available()) {
+      response += char(client.read());
+    }
+    if (response.indexOf("200 OK") > 0) {
+      client.stop();
+      return true;
+    } else {
+      Serial.println("Pushbullet API error:");
+      Serial.println(response);
+      client.stop();
+      return false;
+    }
+  } else {
+    Serial.println("Connection failed");
+    return false;
+  }
+  return false;
 }
