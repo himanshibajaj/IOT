@@ -1,26 +1,48 @@
-#include <WiFi.h>
-#include <WiFiClient.h>
-#include <BlynkSimpleEsp32.h>  // If using ESP32
-//#include <BlynkSimpleEsp8266.h>  // Uncomment if using ESP8266 (NodeMCU)
+// EXPERIMENT 5: Blynk-based LED Control using NodeMCU (ESP8266)
 
-char auth[] = "Your_Blynk_Auth_Token";
-char ssid[] = "Your_WiFi_Name";
-char pass[] = "Your_WiFi_Password";
+#define BLYNK_TEMPLATE_ID "TMPL34XZr63KO"
+#define BLYNK_TEMPLATE_NAME "Led Blink"
+#define BLYNK_AUTH_TOKEN "" // Replace with your Blynk Token
 
-#define LED_PIN 2   // Built-in LED (GPIO2 for NodeMCU)
+#include <ESP8266WiFi.h>
+#include <BlynkSimpleEsp8266.h>
+
+// WiFi credentials
+char auth[] = ""; // Your Blynk Auth Token
+char ssid[] = "";                        // Your WiFi SSID
+char pass[] = "";                        // Your WiFi Password
+
+// Define the LED pin
+#define LED_PIN D4 // Built-in LED (GPIO2)
+
+// This function will be called every time the Button (V0) is pressed in Blynk app
+BLYNK_WRITE(V0) {
+  int value = param.asInt(); // Read button value (0 or 1)
+
+  if (value == 1) {
+    Serial.println("04 | LED OFF");
+    digitalWrite(LED_PIN, LOW); // Turn ON LED (inverse logic)
+  } else {
+    Serial.println("04 | LED ON");
+    digitalWrite(LED_PIN, HIGH); // Turn OFF LED
+  }
+}
 
 void setup() {
-  Serial.begin(115200);
-  Blynk.begin(auth, ssid, pass);
+  // Start serial communication for debugging
+  Serial.begin(9600);
+
+  // Initialize the LED pin as an output
   pinMode(LED_PIN, OUTPUT);
+
+  // Ensure the LED is initially OFF
+  digitalWrite(LED_PIN, HIGH);
+
+  // Connect to WiFi and Blynk server
+  Blynk.begin(auth, ssid, pass);
 }
 
 void loop() {
+  // Run Blynk to keep connection alive
   Blynk.run();
-}
-
-// Button Widget linked to Virtual Pin V0 to control the LED
-BLYNK_WRITE(V0) {
-  int pinValue = param.asInt();  // Get the state of the button
-  digitalWrite(LED_PIN, pinValue);  // Turn LED on or off based on button state
 }
