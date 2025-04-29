@@ -1,45 +1,57 @@
+#include <DHTesp.h>
 #include <ESP8266WiFi.h>
-#include <DHT.h>
-#include <ThingSpeak.h>
 
-#define DHTPIN D4
-#define DHTTYPE DHT11
+String apiKey = ""; // Replace with your Write API Key from ThingSpeak
+const char *ssid = ""; // Replace with your WiFi SSID
+const char *pass = ""; // Replace with your WiFi Password
+const char *server = "api.thingspeak.com";
+#define DHTPIN 4 // Pin where the DHT11 is connected
 
-const char* ssid = "";       
-const char* password = "";  
-unsigned long channelID = YourChannelID;   
-const char* writeAPIKey = "YourWriteAPIKey";
-
+DHTesp dht;
 WiFiClient client;
-DHT dht(DHTPIN, DHTTYPE);
 
 void setup() {
-  Serial.begin(115200);
-  WiFi.begin(ssid, password);
-  dht.begin();
-  ThingSpeak.begin(client);
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("WiFi Connected!");
+    Serial.begin(9600); // Setting Baud rate to 9600
+    delay(10);
+    dht.setup(DHTPIN, DHTesp::DHT11); // Connect DHT sensor to GPIO 4
+    Serial.println("Connecting to ");
+    Serial.println(ssid);
+    WiFi.begin(ssid, pass);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println("\nWiFi connected");
 }
 
 void loop() {
-  float h = dht.readHumidity();
-  float t = dht.readTemperature();
+    float h = dht.getHumidity(); // Read humidity
+    float t = dht.getTemperature(); // Read temperature
 
-  Serial.print("Humidity: ");
-  Serial.print(h);
-  Serial.print("%, Temperature: ");
-  Serial.print(t);
-  Serial.println("C");
+    if (isnan(h) || isnan(t)) {
+        Serial.println("Failed to read from DHT sensor!");
+        return;
+    }
 
-  ThingSpeak.setField(1, t);
-  ThingSpeak.setField(2, h);
+    if (client.connect(server, 80)) {
+        String postStr = apiKey;
+        postStr += "&field1=";
+        postStr += String(t);
+        postStr += "&field2=";
+        postStr += String(h);
+        postStr += "\r\n\r\n";
 
-  ThingSpeak.writeFields(channelID, writeAPIKey);
-
-  delay(20000);
+        client.print("POST /update HTTP/1.1\n");
+        client.print("Host: api.thingspeak.com\n");
+        client.print("Connection: close\n");
+        client.print("X-THINGSPEAKAPIKEY: " + apiKey + "\n");
+        client.print("Content-Type: application/x-www-form-urlencoded\n");
+        client.print("Content-Length: ");
+        client.print(postStr.length());
+        client.print("\n\n");
+        client.print(postStr);
+        Serial.println("Data Sent to ThingSpeak.");
+    }
+    client.stop();
+    delay(15000); // ThingSpeak requires a 15-second delay between updates
 }
